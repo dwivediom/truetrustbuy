@@ -183,7 +183,7 @@ export default function LandingPage() {
         <div className="relative z-10 mx-auto max-w-5xl px-6 text-center">
           <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-4 py-2 text-sm font-bold tracking-tight text-brand-700 shadow-sm">
             <Bot className="h-4 w-4 shrink-0" aria-hidden />
-            Powered by Gemini 2.5 Agentic Search
+            Powered by Agentic Search
           </div>
 
           <h1 className="mb-6 mx-auto text-5xl font-extrabold leading-[1.1] tracking-tighter text-slate-900 md:text-7xl">
