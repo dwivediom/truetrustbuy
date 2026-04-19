@@ -6,21 +6,37 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "seed:admin": "tsx scripts/seed-admin.ts",
+    "seed:demo": "tsx scripts/seed-demo-catalog.ts",
+    "seed:apex": "tsx scripts/seed-apex-polymers.ts",
+    "test": "tsx --test src/lib/search/query-parser.test.ts src/lib/search/match-tiers.test.ts",
+    "smoke:api": "bash scripts/smoke-api.sh"
   },
   "dependencies": {
+    "@google/genai": "^1.50.1",
+    "@tanstack/react-table": "^8.21.3",
+    "@xenova/transformers": "^2.17.2",
+    "bcryptjs": "^3.0.3",
+    "lucide-react": "^1.7.0",
+    "mongoose": "^8.23.0",
     "next": "16.2.2",
+    "next-auth": "^5.0.0-beta.30",
+    "pdf-parse": "^1.1.1",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pdf-parse": "^1.1.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.2",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }
