@@ -141,7 +141,7 @@ export default function LandingPage() {
               href="/register/seller"
               className="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-bold text-white transition-all hover:bg-brand-600 hover:shadow-lg active:scale-95"
             >
-              List your Factory
+              Join as Seller
             </Link>
           </div>
 
@@ -172,7 +172,7 @@ export default function LandingPage() {
                 Sign In
               </Link>
               <Link href="/register/seller" onClick={() => setMobileNavOpen(false)}>
-                List your Factory
+                Join as Seller
               </Link>
             </div>
           </div>

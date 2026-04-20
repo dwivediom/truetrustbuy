@@ -1,8 +1,18 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { SearchView } from "../search-view";
+import { SiteChrome } from "@/components/layout/SiteChrome";
+import {
+  SearchResultsListing,
+  SearchSlugSsrHeader,
+} from "@/components/search/SearchResultsListing";
+import { parseSearchIntent } from "@/lib/search/intent";
+import { buildSearchFaqJsonLd } from "@/lib/seo/search-faq-jsonld";
+import { buildSearchItemListJsonLd } from "@/lib/seo/search-item-list-jsonld";
+import { runTierAwareSearch } from "@/lib/search/tier-aware-search";
+import { getPublicSiteOrigin } from "@/lib/site-url";
+import { SearchViewInner } from "../search-view";
 
-const SITE = process.env.AUTH_URL?.replace(/\/$/, "") ?? "https://truetrustbuy.com";
+export const dynamic = "force-dynamic";
 
 /** Path segment → natural-language query (`glass-bottle` → `glass bottle`). */
 export function slugToSearchQuery(slug: string): string {
@@ -20,6 +30,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const phrase = slugToSearchQuery(slug);
+  const siteOrigin = getPublicSiteOrigin();
   const title =
     phrase.length > 0
       ? `${phrase} — suppliers & wholesale pricing | TrueTrustBuy`
@@ -29,7 +40,7 @@ export async function generateMetadata({
       ? `Find B2B suppliers for ${phrase}. Compare MOQ, tier pricing, and verified manufacturers on TrueTrustBuy.`
       : "B2B supplier discovery with MOQ-aware pricing.";
   const pathSegment = encodeURIComponent(slug).replace(/%2F/gi, "/");
-  const canonical = `${SITE}/search/${pathSegment}`;
+  const canonical = `${siteOrigin}/search/${pathSegment}`;
 
   return {
     title,
@@ -48,15 +59,61 @@ export default async function SearchSlugPage({
   const { slug } = await params;
   const prefilledQuery = slugToSearchQuery(slug);
 
-  return (
-    <Suspense
-      fallback={
-        <main className="min-h-screen bg-slate-50 px-6 py-12 text-center text-sm font-medium text-slate-500">
-          Loading search…
-        </main>
+  const intent = await parseSearchIntent(prefilledQuery);
+  const searchOut = await runTierAwareSearch(prefilledQuery, intent, { skipSearchLog: true });
+
+  const jsonLd = buildSearchItemListJsonLd(searchOut.results);
+  const faqLd = buildSearchFaqJsonLd(prefilledQuery, searchOut.results.length);
+
+  const snapshot = {
+    results: JSON.parse(JSON.stringify(searchOut.results)),
+    intent: JSON.parse(JSON.stringify(searchOut.intent)),
+  };
+
+  const categoryHints = [...new Set(searchOut.results.map((r) => r.category).filter(Boolean))].slice(
+    0,
+    3,
+  ) as string[];
+
+  const intentHint = searchOut.intent
+    ? {
+        quantity: searchOut.intent.quantity ?? undefined,
+        maxUnitPrice: searchOut.intent.maxUnitPrice ?? undefined,
       }
-    >
-      <SearchView prefilledQuery={prefilledQuery} />
-    </Suspense>
+    : undefined;
+
+  return (
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }} />
+      <Suspense
+        fallback={
+          <main className="min-h-screen bg-slate-50 px-6 py-12 text-center text-sm font-medium text-slate-500">
+            Loading search…
+          </main>
+        }
+      >
+        <SiteChrome>
+          <SearchViewInner
+            prefilledQuery={prefilledQuery}
+            initialSearchSnapshot={snapshot}
+            headerSlot={
+              <SearchSlugSsrHeader
+                phraseSeed={prefilledQuery}
+                resultCount={searchOut.results.length}
+                categoryHints={categoryHints}
+              />
+            }
+            resultsSlot={
+              <SearchResultsListing
+                variant="search"
+                intentHint={intentHint}
+                results={searchOut.results}
+              />
+            }
+          />
+        </SiteChrome>
+      </Suspense>
+    </>
   );
 }

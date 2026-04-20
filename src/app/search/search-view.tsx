@@ -1,5 +1,12 @@
 "use client";
 
+import {
+  seoIntroForSeed,
+  searchHeadlineForSeed,
+  tierHighlightFor,
+  tierLabel,
+  titleCasePhrase,
+} from "@/components/search/search-display-utils";
 import { ASSISTANT_NAME } from "@/lib/brand/assistant";
 import {
   CHOOSE_LANGUAGE_LINE,
@@ -23,10 +30,11 @@ import {
   ShieldCheck,
   X,
 } from "lucide-react";
+import { absoluteUrl } from "@/lib/site-url";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 type SearchIntent = {
   productType?: string;
@@ -90,11 +98,6 @@ type ChatMsg = {
   fromAssistant?: boolean;
 };
 
-function tierLabel(min: number, max: number | null): string {
-  if (max == null) return `≥ ${min} pcs`;
-  return `${min} – ${max} pcs`;
-}
-
 type BuyerIntakeApi = {
   intake: {
     preferredLanguage: string;
@@ -144,18 +147,32 @@ function intentCtaLabels(replyLang: string): { confirm: string; callback: string
 export type SearchViewProps = {
   /** From `/search/[slug]` — URL `?q=` wins when both exist. */
   prefilledQuery?: string;
+  /** Server-rendered search results (slug pages) to avoid duplicate API calls. */
+  initialSearchSnapshot?: {
+    results: ResultItem[];
+    intent: SearchIntent | null;
+  };
 };
 
-export function SearchView(props: SearchViewProps = {}) {
-  const { prefilledQuery } = props;
+export type SearchViewInnerProps = SearchViewProps & {
+  /** SSR listing + empty state HTML injected before hydration (slug/base browse). */
+  resultsSlot?: ReactNode;
+  /** SSR H1 + intro when keyword pages should not rely on client for headings. */
+  headerSlot?: ReactNode;
+};
+
+export function SearchViewInner(props: SearchViewInnerProps = {}) {
+  const { prefilledQuery, initialSearchSnapshot, resultsSlot, headerSlot } = props;
   const searchParams = useSearchParams();
   const urlQ = searchParams.get("q")?.trim() ?? "";
   const resolvedSeed = urlQ || (prefilledQuery?.trim() ?? "");
   const { data: session, status: sessionStatus } = useSession();
 
   const [q, setQ] = useState(resolvedSeed);
-  const [intent, setIntent] = useState<SearchIntent | null>(null);
-  const [results, setResults] = useState<ResultItem[]>([]);
+  const [intent, setIntent] = useState<SearchIntent | null>(
+    () => initialSearchSnapshot?.intent ?? null,
+  );
+  const [results, setResults] = useState<ResultItem[]>(() => initialSearchSnapshot?.results ?? []);
   const [loading, setLoading] = useState(false);
   const [parseLoading, setParseLoading] = useState(false);
   const [error, setError] = useState("");
@@ -183,6 +200,12 @@ export function SearchView(props: SearchViewProps = {}) {
   const [intentContactEmail, setIntentContactEmail] = useState("");
   const [intentContactPhone, setIntentContactPhone] = useState("");
   const [intentSubmitting, setIntentSubmitting] = useState(false);
+
+  const serverSnapshotConsumed = useRef(false);
+  /** After explicit client search, hide SSR slot and show interactive list + loading states. */
+  const [hasClientSupersededSsr, setHasClientSupersededSsr] = useState(false);
+
+  const showSsrListing = Boolean(resultsSlot && !hasClientSupersededSsr);
 
   const overrides = useMemo(
     () => ({
@@ -227,6 +250,7 @@ export function SearchView(props: SearchViewProps = {}) {
 
   const runSearch = useCallback(async () => {
     if (!q.trim()) return;
+    setHasClientSupersededSsr(true);
     setLoading(true);
     setError("");
     try {
@@ -267,6 +291,9 @@ export function SearchView(props: SearchViewProps = {}) {
     let cancelled = false;
     void (async () => {
       if (!resolvedSeed.trim()) {
+        if (resultsSlot) {
+          return;
+        }
         setLoading(true);
         setError("");
         try {
@@ -280,6 +307,16 @@ export function SearchView(props: SearchViewProps = {}) {
         }
         return;
       }
+
+      if (
+        initialSearchSnapshot &&
+        !serverSnapshotConsumed.current &&
+        resolvedSeed === (prefilledQuery?.trim() ?? "")
+      ) {
+        serverSnapshotConsumed.current = true;
+        return;
+      }
+
       setLoading(true);
       setError("");
       try {
@@ -299,7 +336,7 @@ export function SearchView(props: SearchViewProps = {}) {
     return () => {
       cancelled = true;
     };
-  }, [resolvedSeed]);
+  }, [resolvedSeed, initialSearchSnapshot, prefilledQuery, resultsSlot]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -363,16 +400,6 @@ export function SearchView(props: SearchViewProps = {}) {
 
   function updateIntent(patch: Partial<SearchIntent>) {
     setIntent((prev) => ({ ...(prev ?? {}), ...patch }));
-  }
-
-  function tierHighlight(tier: TierBand): boolean {
-    const qty = intent?.quantity;
-    const maxP = intent?.maxUnitPrice;
-    if (maxP != null && tier.unitPrice > maxP) return false;
-    if (qty == null) return maxP != null && tier.unitPrice <= maxP;
-    if (tier.minQty > qty) return false;
-    if (tier.maxQty != null && tier.maxQty < qty) return false;
-    return true;
   }
 
   function welcomeMessages(sellerName: string): ChatMsg[] {
@@ -554,6 +581,18 @@ export function SearchView(props: SearchViewProps = {}) {
     return parts[0] ?? "your search";
   }, [intent?.productType, q]);
 
+  const searchHeadline = useMemo(
+    () => searchHeadlineForSeed(resolvedSeed),
+    [resolvedSeed],
+  );
+
+  const seoIntroText = useMemo(() => seoIntroForSeed(resolvedSeed), [resolvedSeed]);
+
+  const categoryHints = useMemo(() => {
+    const cats = [...new Set(results.map((r) => r.category).filter(Boolean))];
+    return cats.slice(0, 3);
+  }, [results]);
+
   const supplierIntentSummaryPreview = useMemo(() => {
     if (!supplierPanelProduct || !intentModal) return "";
     return buildSupplierIntentSummary({
@@ -581,7 +620,7 @@ export function SearchView(props: SearchViewProps = {}) {
         : "";
 
   return (
-    <SiteChrome>
+    <>
       <div className="min-h-[calc(100vh-4rem)] bg-slate-50">
         {/* Search hero strip */}
         <div className="border-b border-slate-200 bg-white/90 backdrop-blur-sm">
@@ -710,20 +749,34 @@ export function SearchView(props: SearchViewProps = {}) {
 
           {/* Results */}
           <div className="min-w-0 flex-1 space-y-5">
-            <div>
-              <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 md:text-3xl">
-                {resolvedSeed.trim() ? "Supplier search" : "Browse suppliers"}
-              </h1>
-              {!resolvedSeed.trim() ? (
-                <p className="mt-2 max-w-2xl text-sm font-medium text-slate-600">
-                  Recent listings from the catalog — enter a query above to filter by product, MOQ, price, or
-                  location.
-                </p>
-              ) : null}
-              <Link href="/" className="mt-2 inline-block text-sm font-semibold text-brand-600 hover:underline">
-                ← Back to home
-              </Link>
-            </div>
+            {headerSlot ?? (
+              <div>
+                <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 md:text-3xl">
+                  {searchHeadline}
+                </h1>
+                <section aria-labelledby="search-seo-intro-heading" className="mt-4 max-w-3xl">
+                  <h2 id="search-seo-intro-heading" className="sr-only">
+                    About this search
+                  </h2>
+                  <p className="text-sm font-medium leading-relaxed text-slate-700">{seoIntroText}</p>
+                  {categoryHints.length > 0 ? (
+                    <p className="mt-3 text-xs font-medium text-slate-600">
+                      Sample categories in results:{" "}
+                      <span className="font-semibold text-slate-800">{categoryHints.join(" · ")}</span>
+                    </p>
+                  ) : null}
+                </section>
+                {!resolvedSeed.trim() ? (
+                  <p className="mt-3 max-w-2xl text-sm font-medium text-slate-600">
+                    Recent listings load below — enter a query above to filter by product, MOQ, price, or
+                    location.
+                  </p>
+                ) : null}
+                <Link href="/" className="mt-2 inline-block text-sm font-semibold text-brand-600 hover:underline">
+                  ← Back to home
+                </Link>
+              </div>
+            )}
 
             {error ? (
               <p className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-900">
@@ -774,6 +827,10 @@ export function SearchView(props: SearchViewProps = {}) {
               </div>
             ) : null}
 
+            {showSsrListing ? (
+              resultsSlot
+            ) : (
+              <>
             {loading && results.length === 0 ? (
               <p className="font-medium text-slate-500">Loading results…</p>
             ) : null}
@@ -798,7 +855,7 @@ export function SearchView(props: SearchViewProps = {}) {
               </div>
             ) : null}
 
-            <ul className="space-y-6">
+            <ul className="m-0 list-none space-y-6 p-0">
               {results.map((product) => {
                 const id = String(product._id);
                 const seller = product.seller;
@@ -808,11 +865,17 @@ export function SearchView(props: SearchViewProps = {}) {
                 ];
                 const cur = product.pricingCurrency || product.pricing.currency;
 
+                const productAbsUrl = absoluteUrl(`/product/${id}`);
+                const storefrontAbsUrl = seller?.userId
+                  ? absoluteUrl(`/seller/${seller.userId}`)
+                  : "";
+
                 return (
-                  <li
-                    key={id}
-                    className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md"
-                  >
+                  <li key={id}>
+                    <article
+                      className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md"
+                      aria-labelledby={`product-title-${id}`}
+                    >
                     <div className="flex flex-col md:flex-row">
                       <div
                         className={`shrink-0 overflow-hidden border-b border-slate-100 md:w-64 md:border-b-0 md:border-r md:border-slate-100 ${
@@ -850,7 +913,8 @@ export function SearchView(props: SearchViewProps = {}) {
                         <div className="flex flex-wrap items-start justify-between gap-4">
                           <div className="min-w-0">
                             <Link
-                              href={`/product/${id}`}
+                              id={`product-title-${id}`}
+                              href={productAbsUrl}
                               className="text-xl font-bold tracking-tight text-slate-900 hover:text-brand-600"
                             >
                               {product.name}
@@ -879,29 +943,37 @@ export function SearchView(props: SearchViewProps = {}) {
 
                         <p className="mt-3 line-clamp-2 text-sm font-medium text-slate-600">{product.description}</p>
 
-                        <div className="mt-5 rounded-2xl border border-slate-100 bg-slate-50/90 p-4">
+                        <dl className="mt-5 rounded-2xl border border-slate-100 bg-slate-50/90 p-4">
                           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                             <div>
-                              <p className="mb-1 flex items-center gap-1 text-xs font-semibold text-slate-500">
+                              <dt className="mb-1 flex items-center gap-1 text-xs font-semibold text-slate-500">
                                 <Package className="h-3 w-3" aria-hidden />
                                 MOQ
-                              </p>
-                              <p className="font-bold text-slate-900">{product.displayMoq} pcs</p>
+                              </dt>
+                              <dd
+                                className="font-bold text-slate-900"
+                                aria-label={`Minimum order quantity ${product.displayMoq} pieces`}
+                              >
+                                {product.displayMoq} pcs
+                              </dd>
                             </div>
                             {product.tierBands.length > 0 ? (
                               product.tierBands.map((tier, idx) => (
                                 <div
                                   key={`${tier.minQty}-${idx}`}
                                   className={
-                                    tierHighlight(tier)
+                                    tierHighlightFor(tier, intent)
                                       ? "rounded-xl border border-emerald-200 bg-emerald-50 p-2 -m-1 sm:m-0"
                                       : ""
                                   }
                                 >
-                                  <p className="mb-1 text-xs font-semibold text-slate-500">
-                                    {tierLabel(tier.minQty, tier.maxQty)}
-                                  </p>
-                                  <p className="flex items-center font-bold text-slate-900">
+                                  <dt className="mb-1 text-xs font-semibold text-slate-500">
+                                    Unit price ({tierLabel(tier.minQty, tier.maxQty)})
+                                  </dt>
+                                  <dd
+                                    className="flex items-center font-bold text-slate-900"
+                                    aria-label={`Unit price ${tier.unitPrice} ${cur} per piece for quantity band ${tierLabel(tier.minQty, tier.maxQty)}`}
+                                  >
                                     {cur === "INR" ? (
                                       <IndianRupee className="h-3.5 w-3.5 shrink-0 text-slate-600" aria-hidden />
                                     ) : (
@@ -909,28 +981,28 @@ export function SearchView(props: SearchViewProps = {}) {
                                     )}
                                     {tier.unitPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                                     <span className="ml-1 text-xs font-medium text-slate-500">/pc</span>
-                                  </p>
+                                  </dd>
                                 </div>
                               ))
                             ) : (
                               <div className="col-span-2 sm:col-span-3">
-                                <p className="mb-1 text-xs font-semibold text-slate-500">List price</p>
-                                <p className="flex items-center font-bold text-slate-900">
+                                <dt className="mb-1 text-xs font-semibold text-slate-500">List price</dt>
+                                <dd className="flex items-center font-bold text-slate-900">
                                   <IndianRupee className="h-3.5 w-3.5 text-slate-600" aria-hidden />
                                   {product.pricing.amount.toLocaleString(undefined, {
                                     maximumFractionDigits: 2,
                                   })}
                                   <span className="ml-1 text-xs font-medium text-slate-500">/ unit</span>
-                                </p>
+                                </dd>
                               </div>
                             )}
                           </div>
-                          {product.tierMatch?.belowMoq ? (
-                            <p className="mt-3 text-xs font-semibold text-amber-800">
-                              Below MOQ at your quantity — tiers show reference bands.
-                            </p>
-                          ) : null}
-                        </div>
+                        </dl>
+                        {product.tierMatch?.belowMoq ? (
+                          <p className="mt-2 text-xs font-semibold text-amber-800">
+                            Below MOQ at your quantity — tiers show reference bands.
+                          </p>
+                        ) : null}
 
                         {chips.length > 0 ? (
                           <div className="mt-4 flex flex-wrap gap-2">
@@ -955,14 +1027,14 @@ export function SearchView(props: SearchViewProps = {}) {
                             Contact supplier
                           </button>
                           <Link
-                            href={`/product/${id}`}
+                            href={productAbsUrl}
                             className="inline-flex flex-1 items-center justify-center rounded-2xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-bold text-slate-800 hover:border-brand-300 hover:text-brand-700 sm:flex-none"
                           >
                             View listing
                           </Link>
-                          {seller?.userId ? (
+                          {seller?.userId && storefrontAbsUrl ? (
                             <Link
-                              href={`/seller/${seller.userId}`}
+                              href={storefrontAbsUrl}
                               className="inline-flex flex-1 items-center justify-center rounded-2xl border border-slate-200 px-5 py-2.5 text-sm font-bold text-slate-700 hover:border-brand-200 sm:flex-none"
                             >
                               Supplier storefront
@@ -971,10 +1043,13 @@ export function SearchView(props: SearchViewProps = {}) {
                         </div>
                       </div>
                     </div>
+                    </article>
                   </li>
                 );
               })}
             </ul>
+              </>
+            )}
           </div>
         </main>
       </div>
@@ -1287,6 +1362,14 @@ export function SearchView(props: SearchViewProps = {}) {
           </div>
         </div>
       ) : null}
+    </>
+  );
+}
+
+export function SearchView(props: SearchViewProps = {}) {
+  return (
+    <SiteChrome>
+      <SearchViewInner {...props} />
     </SiteChrome>
   );
 }

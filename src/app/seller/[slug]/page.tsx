@@ -6,6 +6,7 @@ import { OrganizationModel } from "@/lib/models/Organization";
 import { ProductModel } from "@/lib/models/Product";
 import { SellerVerificationModel } from "@/lib/models/SellerVerification";
 import { UserModel } from "@/lib/models/User";
+import { absoluteUrl } from "@/lib/site-url";
 import { Metadata } from "next";
 import { Types } from "mongoose";
 
@@ -35,13 +36,17 @@ export async function generateMetadata({
   const title = industry ? `${titleBase} · ${industry}` : titleBase;
   const description = `Verified B2B supplier storefront for ${u.name}${industry ? ` in ${industry}` : ""}. Browse SKUs and start a guided chat.`;
 
+  const url = absoluteUrl(`/seller/${slug}`);
+
   return {
     title,
     description,
+    alternates: { canonical: url },
     openGraph: {
       title,
       description,
       type: "website",
+      url,
     },
   };
 }

@@ -4,6 +4,8 @@ import { SiteChrome } from "@/components/layout/SiteChrome";
 import { connectDb } from "@/lib/db";
 import { ProductModel } from "@/lib/models/Product";
 import { slugifyCategory } from "@/lib/slug";
+import { absoluteUrl } from "@/lib/site-url";
+import type { Metadata } from "next";
 import { Types } from "mongoose";
 
 type ProductLean = {
@@ -16,6 +18,43 @@ type ProductLean = {
   pricing: { amount: number; currency: string; billingPeriod: string };
   metadata?: { sellerOrgId?: string; website?: string };
 };
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  if (!Types.ObjectId.isValid(slug)) {
+    return { title: "Product | TrueTrustBuy" };
+  }
+  await connectDb();
+  const raw = await ProductModel.findById(slug)
+    .select("name description category images pricing")
+    .lean();
+  const product = raw ? (raw as unknown as ProductLean) : null;
+  if (!product) {
+    return { title: "Product | TrueTrustBuy" };
+  }
+  const title = `${product.name} | TrueTrustBuy`;
+  const description =
+    product.description.length > 160 ? `${product.description.slice(0, 157)}…` : product.description;
+  const url = absoluteUrl(`/product/${slug}`);
+  return {
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      title,
+      description,
+      url,
+      type: "website",
+      ...(product.images?.[0]
+        ? { images: [{ url: product.images[0], alt: product.name }] }
+        : {}),
+    },
+  };
+}
 
 export default async function ProductDetailPage({
   params,
@@ -39,9 +78,28 @@ export default async function ProductDetailPage({
 
   const id = String(product._id);
   const sellerId = product.metadata?.sellerOrgId?.trim();
+  const canonical = absoluteUrl(`/product/${slug}`);
+
+  const productLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    description: product.description,
+    sku: id,
+    url: canonical,
+    category: product.category,
+    offers: {
+      "@type": "Offer",
+      price: String(product.pricing.amount),
+      priceCurrency: product.pricing.currency,
+      availability: "https://schema.org/InStock",
+    },
+    ...(product.images?.[0] ? { image: [product.images[0]] } : {}),
+  };
 
   return (
     <SiteChrome>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productLd) }} />
       <main className="mx-auto max-w-3xl px-6 py-12">
         <nav className="text-sm font-medium text-slate-500">
           <Link href="/categories" className="text-brand-600 hover:underline">

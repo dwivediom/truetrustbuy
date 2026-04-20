@@ -6,12 +6,19 @@
 - Internal links from homepage “trending” and footer to `/search?q=...`.
 - Programmatic **market** URLs: `/market/[category]/[city]` with strong metadata and FAQ schema.
 
+## Site URL (canonicals, OG, sitemap, robots, manifest)
+
+- Use **`NEXT_PUBLIC_SITE_URL`** (e.g. `https://www.truetrustbuy.in`) as the primary public origin. Resolved in [`src/lib/site-url.ts`](../../src/lib/site-url.ts) with fallbacks: `SITE_URL`, `AUTH_URL`, then dev `http://localhost:3000` or a hardcoded prod fallback.
+- [`src/app/layout.tsx`](../../src/app/layout.tsx) `metadataBase`, [`src/app/robots.ts`](../../src/app/robots.ts) sitemap URL, [`src/app/sitemap.ts`](../../src/app/sitemap.ts), homepage JSON-LD in [`src/app/page.tsx`](../../src/app/page.tsx), market/search/product/category/seller metadata all use this origin so **canonical and Open Graph match the deployed host**.
+
 ## Current state
 
 - Landing: trending + footer links → `/search?q=...`.
+- [`src/app/manifest.ts`](../../src/app/manifest.ts): Web App Manifest with dynamic `start_url`.
 - `/market/[category]/[city]`: **metadata + FAQ JSON-LD**; body links to search.
-- `/categories`, `/category/[slug]`: category hubs (distinct categories + listings).
-- **Path-based search** (see `src/app/search/[slug]/page.tsx`; e.g. `/search/glass-bottle`): one URL segment; hyphens map to spaces in the search box. `generateMetadata` sets title, description, **Open Graph**, and a **self-referential canonical** (base URL from `AUTH_URL` or `https://truetrustbuy.com`). This is **separate** from `?q=` URLs; pick a single canonical style in internal links to avoid duplicate-indexing the same intent.
+- `/categories`, `/category/[slug]`: category hubs (distinct categories + listings); **`generateMetadata`** + canonical on category hub.
+- **Path-based search** (`src/app/search/[slug]/page.tsx`; e.g. `/search/glass-bottle`): hyphens → spaces in the UI; **`ItemList` JSON-LD** (products + `AggregateOffer` bands) emitted on the server; **slug pages** pass an initial search snapshot into `SearchView` to avoid a duplicate API round-trip. Dynamic **H1** and an **intro paragraph** support crawlers and LLMs. Listing cards use **`article`**, **`dl`/`dt`/`dd`**, and **absolute** product/seller URLs via `absoluteUrl()`.
+- **PDP** (`src/app/product/[slug]/page.tsx`): `generateMetadata` + **Product** JSON-LD script.
 
 ## How large orgs think about it (and how we use that here)
 

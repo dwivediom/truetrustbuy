@@ -1,4 +1,5 @@
 import { AuthSessionProvider } from "@/components/providers/auth-session-provider";
+import { getPublicSiteOrigin } from "@/lib/site-url";
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
@@ -9,8 +10,10 @@ const plusJakarta = Plus_Jakarta_Sans({
   variable: "--font-plus-jakarta",
 });
 
+const siteOrigin = getPublicSiteOrigin();
+
 export const metadata: Metadata = {
-  metadataBase: new URL("https://truetrustbuy.com"),
+  metadataBase: new URL(siteOrigin),
   title: {
     default: "TrueTrustBuy | B2B supplier discovery",
     template: "%s | TrueTrustBuy",
@@ -22,7 +25,7 @@ export const metadata: Metadata = {
     title: "TrueTrustBuy | B2B supplier discovery",
     description:
       "Find GST-verified suppliers, compare quotes, and search by natural language intent.",
-    url: "https://truetrustbuy.com",
+    url: siteOrigin,
   },
   alternates: {
     canonical: "/",

@@ -119,7 +119,7 @@ export default function RegisterSellerPage() {
           Manufacturer onboarding
         </p>
         <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-900 md:text-4xl">
-          List your factory
+          Join as Seller
         </h1>
         <p className="mt-2 text-lg font-medium text-slate-600">
           Create your seller account, set how your AI assistant should behave, then build your catalog and

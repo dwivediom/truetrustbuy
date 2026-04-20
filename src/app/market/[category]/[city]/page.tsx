@@ -1,4 +1,5 @@
 import { SiteChrome } from "@/components/layout/SiteChrome";
+import { absoluteUrl } from "@/lib/site-url";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -10,7 +11,7 @@ export async function generateMetadata({
   const { category, city } = await params;
   const title = `${category.replace(/-/g, " ")} suppliers in ${city.replace(/-/g, " ")} | TrueTrustBuy`;
   const description = `Find verified ${category.replace(/-/g, " ")} manufacturers and suppliers in ${city.replace(/-/g, " ")} with MOQ and pricing filters.`;
-  const url = `https://truetrustbuy.com/market/${category}/${city}`;
+  const url = absoluteUrl(`/market/${category}/${city}`);
   return {
     title,
     description,

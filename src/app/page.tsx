@@ -1,5 +1,8 @@
 import LandingPage from "@/components/LandingPage";
+import { getPublicSiteOrigin } from "@/lib/site-url";
 import type { Metadata } from "next";
+
+const siteOrigin = getPublicSiteOrigin();
 
 export const metadata: Metadata = {
   title: "TrueTrustBuy | Agentic B2B sourcing & negotiation",
@@ -21,7 +24,7 @@ export const metadata: Metadata = {
     title: "TrueTrustBuy | Agentic B2B sourcing & negotiation",
     description:
       "Find the exact deal: AI-assisted matching, GST-verified suppliers, and RFQ-ready context for Indian B2B procurement.",
-    url: "https://truetrustbuy.com/",
+    url: `${siteOrigin}/`,
     type: "website",
   },
   twitter: {
@@ -33,11 +36,12 @@ export const metadata: Metadata = {
 };
 
 export default function Home() {
+  const base = getPublicSiteOrigin();
   const organizationLdJson = {
     "@context": "https://schema.org",
     "@type": "Organization",
     name: "TrueTrustBuy",
-    url: "https://truetrustbuy.com",
+    url: base,
     description:
       "B2B marketplace for GST-verified manufacturers with AI-assisted sourcing, tier matching, and RFQ workflows.",
   };
@@ -46,10 +50,10 @@ export default function Home() {
     "@context": "https://schema.org",
     "@type": "WebSite",
     name: "TrueTrustBuy",
-    url: "https://truetrustbuy.com",
+    url: base,
     potentialAction: {
       "@type": "SearchAction",
-      target: "https://truetrustbuy.com/search?q={search_term_string}",
+      target: `${base}/search?q={search_term_string}`,
       "query-input": "required name=search_term_string",
     },
   };

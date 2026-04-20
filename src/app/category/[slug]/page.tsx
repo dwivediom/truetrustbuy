@@ -4,6 +4,31 @@ import { SiteChrome } from "@/components/layout/SiteChrome";
 import { connectDb } from "@/lib/db";
 import { ProductModel } from "@/lib/models/Product";
 import { slugifyCategory } from "@/lib/slug";
+import { absoluteUrl } from "@/lib/site-url";
+import type { Metadata } from "next";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  await connectDb();
+  const all = (await ProductModel.distinct("category")) as string[];
+  const resolvedName = all.find((c) => slugifyCategory(c) === slug) ?? null;
+  if (!resolvedName) {
+    return { title: "Category | TrueTrustBuy" };
+  }
+  const title = `${resolvedName} — B2B wholesale suppliers | TrueTrustBuy`;
+  const description = `Browse wholesale ${resolvedName} listings from verified sellers. Compare MOQ, pricing, and chat with suppliers on TrueTrustBuy.`;
+  const url = absoluteUrl(`/category/${slug}`);
+  return {
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: { title, description, url, type: "website" },
+  };
+}
 
 export default async function CategoryDetailPage({
   params,

@@ -1,3 +1,4 @@
+import { absoluteUrl } from "@/lib/site-url";
 import type { MetadataRoute } from "next";
 
 export default function robots(): MetadataRoute.Robots {
@@ -7,7 +8,7 @@ export default function robots(): MetadataRoute.Robots {
       allow: "/",
       disallow: ["/admin", "/seller", "/buyer", "/api"],
     },
-    sitemap: "https://truetrustbuy.com/sitemap.xml",
+    sitemap: absoluteUrl("/sitemap.xml"),
   };
 }
 

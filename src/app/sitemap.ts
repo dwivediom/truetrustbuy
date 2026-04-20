@@ -1,7 +1,8 @@
+import { getPublicSiteOrigin } from "@/lib/site-url";
 import type { MetadataRoute } from "next";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const base = "https://truetrustbuy.com";
+  const base = getPublicSiteOrigin();
   const categories = ["glass-bottles", "industrial-pumps", "hospital-software"];
   const cities = ["mumbai", "delhi", "pune"];
   const programmatic = categories.flatMap((category) =>
